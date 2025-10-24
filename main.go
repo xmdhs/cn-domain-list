@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"log"
 	"net"
@@ -83,7 +85,7 @@ func main() {
 				if c.Country.IsoCode == "CN" {
 					dlLock.Lock()
 					dl = append(dl, txt)
-					f.WriteString(txt + "\n")
+					lo.Must(f.WriteString(txt + "\n"))
 					dlLock.Unlock()
 				}
 				return nil
@@ -96,14 +98,11 @@ func main() {
 	uList = lo.Filter(uList, func(item string, index int) bool {
 		return item != ""
 	})
-	geo := geo{
-		Version: 1,
+	geoData := geo{
+		Version: 2,
 		Rules: []rule{
 			{
-				DomainSuffix: lo.Map(uList, func(item string, index int) string {
-					return "." + item
-				}),
-				Domain: uList,
+				DomainSuffix: uList,
 			},
 		},
 	}
@@ -112,7 +111,43 @@ func main() {
 	e := json.NewEncoder(nf)
 	e.SetIndent("", "    ")
 	e.SetEscapeHTML(false)
-	lo.Must0(e.Encode(geo))
+	lo.Must0(e.Encode(geoData))
+
+	domainGroups := make(map[string][]string)
+	for _, domain := range uList {
+		hasher := sha256.New()
+		hasher.Write([]byte(domain))
+		hash := hex.EncodeToString(hasher.Sum(nil))
+		firstChar := string(hash[0])
+		domainGroups[firstChar] = append(domainGroups[firstChar], domain)
+	}
+
+	lo.Must0(os.MkdirAll("site", 0755))
+
+	for char, domains := range domainGroups {
+		geoData := geo{
+			Version: 2,
+			Rules: []rule{
+				{
+					DomainSuffix: domains,
+				},
+			},
+		}
+		filePath := "site/" + char + ".json"
+		nf, err := os.Create(filePath)
+		if err != nil {
+			log.Printf("Failed to create file %s: %v", filePath, err)
+			continue
+		}
+		defer nf.Close()
+
+		e := json.NewEncoder(nf)
+		e.SetIndent("", "    ")
+		e.SetEscapeHTML(false)
+		if err := e.Encode(geoData); err != nil {
+			log.Printf("Failed to write to file %s: %v", filePath, err)
+		}
+	}
 }
 
 func geosite() map[string]struct{} {
@@ -161,6 +196,6 @@ type geo struct {
 }
 
 type rule struct {
-	DomainSuffix []string `json:"domain_suffix"`
-	Domain       []string `json:"domain"`
+	DomainSuffix []string `json:"domain_suffix,omitempty"`
+	Domain       []string `json:"domain,omitempty"`
 }
