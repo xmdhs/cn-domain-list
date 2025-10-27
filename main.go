@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/avast/retry-go/v4"
+	"github.com/goccy/go-yaml"
 	"github.com/oschwald/geoip2-golang"
 	"github.com/samber/lo"
 	"github.com/schollz/progressbar/v3"
@@ -31,7 +32,7 @@ func main() {
 	ctx := context.Background()
 
 	g, gCtx := errgroup.WithContext(ctx)
-	g.SetLimit(32)
+	g.SetLimit(64)
 
 	dl, last := readLog(set)
 	dlLock := &sync.Mutex{}
@@ -95,23 +96,21 @@ func main() {
 	lo.Must0(g.Wait())
 	slices.Sort(dl)
 	uList := lo.Uniq(dl)
+	uMap := make(map[string]struct{})
 	uList = lo.Filter(uList, func(item string, index int) bool {
+		uMap[item] = struct{}{}
 		return item != ""
 	})
-	geoData := geo{
-		Version: 2,
-		Rules: []rule{
-			{
-				DomainSuffix: uList,
-			},
-		},
-	}
-	nf := lo.Must(os.Create("ext-cn-list.json"))
-	defer nf.Close()
-	e := json.NewEncoder(nf)
-	e.SetIndent("", "    ")
-	e.SetEscapeHTML(false)
-	lo.Must0(e.Encode(geoData))
+
+	writeRuleFile(uList, "ext-cn-list")
+
+	slices.Sort(sl)
+	nCnList := lo.Uniq(sl)
+	nCnList = lo.Filter(nCnList, func(item string, index int) bool {
+		_, ok := uMap[item]
+		return !ok
+	})
+	writeRuleFile(nCnList, "ext-not-cn-list")
 
 	domainGroups := make(map[string][]string)
 	for _, domain := range uList {
@@ -148,6 +147,34 @@ func main() {
 			log.Printf("Failed to write to file %s: %v", filePath, err)
 		}
 	}
+}
+
+func writeRuleFile(dl []string, fileName string) {
+	geoData := geo{
+		Version: 2,
+		Rules: []rule{
+			{
+				DomainSuffix: dl,
+			},
+		},
+	}
+	nf := lo.Must(os.Create(fileName + ".json"))
+	defer nf.Close()
+	e := json.NewEncoder(nf)
+	e.SetIndent("", "    ")
+	e.SetEscapeHTML(false)
+	lo.Must0(e.Encode(geoData))
+
+	clashList := lo.Map(dl, func(item string, index int) string {
+		return "+." + item
+	})
+
+	c := clash{
+		Payload: clashList,
+	}
+	b := lo.Must(yaml.Marshal(c))
+	lo.Must0(os.WriteFile(fileName+".yaml", b, 0666))
+
 }
 
 func geosite() map[string]struct{} {
@@ -198,4 +225,8 @@ type geo struct {
 type rule struct {
 	DomainSuffix []string `json:"domain_suffix,omitempty"`
 	Domain       []string `json:"domain,omitempty"`
+}
+
+type clash struct {
+	Payload []string `yaml:"payload"`
 }
