@@ -34,7 +34,8 @@ func main() {
 	g, gCtx := errgroup.WithContext(ctx)
 	g.SetLimit(64)
 
-	dl, last := readLog(set)
+	dl, last := readLog("domain.log")
+	ndl, _ := readLog("domain-not-cn.log")
 	dlLock := &sync.Mutex{}
 
 	sl := strings.Split(string(b), "\n")
@@ -42,6 +43,8 @@ func main() {
 
 	f := lo.Must(os.OpenFile("domain.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644))
 	defer f.Close()
+	nf := lo.Must(os.OpenFile("domain-not-cn.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644))
+	defer nf.Close()
 
 	bar := progressbar.Default(int64(donmainLen))
 	skip := last != ""
@@ -83,12 +86,15 @@ func main() {
 					return nil
 				}
 				c := lo.Must(db.Country(netip))
+				dlLock.Lock()
 				if c.Country.IsoCode == "CN" {
-					dlLock.Lock()
 					dl = append(dl, txt)
 					lo.Must(f.WriteString(txt + "\n"))
-					dlLock.Unlock()
+				} else {
+					ndl = append(ndl, txt)
+					lo.Must(nf.WriteString(txt + "\n"))
 				}
+				dlLock.Unlock()
 				return nil
 			}, retryOpts...)
 		})
@@ -96,19 +102,16 @@ func main() {
 	lo.Must0(g.Wait())
 	slices.Sort(dl)
 	uList := lo.Uniq(dl)
-	uMap := make(map[string]struct{})
 	uList = lo.Filter(uList, func(item string, index int) bool {
-		uMap[item] = struct{}{}
 		return item != ""
 	})
 
 	writeRuleFile(uList, "ext-cn-list")
 
-	slices.Sort(sl)
-	nCnList := lo.Uniq(sl)
+	slices.Sort(ndl)
+	nCnList := lo.Uniq(ndl)
 	nCnList = lo.Filter(nCnList, func(item string, index int) bool {
-		_, ok := uMap[item]
-		return !ok
+		return item != ""
 	})
 	writeRuleFile(nCnList, "ext-not-cn-list")
 
@@ -193,20 +196,14 @@ func readGeoSite(filename string, set map[string]struct{}) {
 	})
 }
 
-func readLog(set map[string]struct{}) ([]string, string) {
-	b, err := os.ReadFile("domain.log")
+func readLog(log string) ([]string, string) {
+	b, err := os.ReadFile(log)
 	if err != nil {
 		return []string{}, ""
 	}
 	list := strings.Split(string(b), "\n")
 	var last string
-	return lo.Filter(list, func(item string, index int) bool {
-		_, ok := set[item]
-		if !ok && item != "" {
-			last = item
-		}
-		return !ok
-	}), last
+	return list, last
 }
 
 var retryOpts = []retry.Option{
