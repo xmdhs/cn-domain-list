@@ -19,12 +19,12 @@ import (
 	"github.com/samber/lo"
 	"github.com/schollz/progressbar/v3"
 	"github.com/tidwall/gjson"
+	"golang.org/x/net/publicsuffix"
 	"golang.org/x/sync/errgroup"
 )
 
 func main() {
 	b := lo.Must(os.ReadFile("cloudflare-radar_top-1000000-domains.csv"))
-	set := geosite()
 
 	db := lo.Must(geoip2.Open("GeoLite2-Country.mmdb"))
 	defer db.Close()
@@ -57,12 +57,12 @@ func main() {
 			bar.Add(1)
 			continue
 		}
-		if _, ok := set[txt]; ok {
-			bar.Add(1)
-			continue
-		}
 		g.Go(func() error {
 			defer bar.Add(1)
+			p, _ := publicsuffix.PublicSuffix(txt)
+			if p == txt {
+				return nil
+			}
 			return retry.Do(func() error {
 				ctx, cancel := context.WithTimeout(gCtx, 10*time.Second)
 				defer cancel()
@@ -178,12 +178,6 @@ func writeRuleFile(dl []string, fileName string) {
 	b := lo.Must(yaml.Marshal(c))
 	lo.Must0(os.WriteFile(fileName+".yaml", b, 0666))
 
-}
-
-func geosite() map[string]struct{} {
-	m := map[string]struct{}{}
-	readGeoSite("geosite-geolocation-!cn.json", m)
-	return m
 }
 
 func readGeoSite(filename string, set map[string]struct{}) {
