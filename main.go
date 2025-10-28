@@ -29,13 +29,15 @@ func main() {
 	db := lo.Must(geoip2.Open("GeoLite2-Country.mmdb"))
 	defer db.Close()
 
+	set := geosite()
+
 	ctx := context.Background()
 
 	g, gCtx := errgroup.WithContext(ctx)
 	g.SetLimit(64)
 
-	dl, last := readLog("domain.log")
-	ndl, _ := readLog("domain-not-cn.log")
+	dl, last := readLog(set, "domain.log")
+	ndl, _ := readLog(set, "domain-not-cn.log")
 	dlLock := &sync.Mutex{}
 
 	sl := strings.Split(string(b), "\n")
@@ -180,6 +182,12 @@ func writeRuleFile(dl []string, fileName string) {
 
 }
 
+func geosite() map[string]struct{} {
+	m := map[string]struct{}{}
+	readGeoSite("geosite-geolocation-!cn.json", m)
+	return m
+}
+
 func readGeoSite(filename string, set map[string]struct{}) {
 	b := lo.Must(os.ReadFile(filename))
 	r := gjson.ParseBytes(b)
@@ -190,14 +198,20 @@ func readGeoSite(filename string, set map[string]struct{}) {
 	})
 }
 
-func readLog(log string) ([]string, string) {
+func readLog(set map[string]struct{}, log string) ([]string, string) {
 	b, err := os.ReadFile(log)
 	if err != nil {
 		return []string{}, ""
 	}
 	list := strings.Split(string(b), "\n")
 	var last string
-	return list, last
+	return lo.Filter(list, func(item string, index int) bool {
+		_, ok := set[item]
+		if !ok && item != "" {
+			last = item
+		}
+		return !ok
+	}), last
 }
 
 var retryOpts = []retry.Option{
