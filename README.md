@@ -30,10 +30,10 @@ rule-providers:
     path: ./ext-cn-list.yaml
     interval: 86400
 
-  ext-not-cn-domain:
+  ext-not-cn-list:
     type: http
     behavior: domain
-    url: "https://raw.githubusercontent.com/xmdhs/cn-domain-list/rule-set/ext-not-cn-domain.yaml"
+    url: "https://raw.githubusercontent.com/xmdhs/cn-domain-list/rule-set/ext-not-cn-list.yaml"
     path: ./ext-not-cn-domain.yaml
     interval: 86400
 ```
