@@ -48,6 +48,8 @@ func main() {
 	nf := lo.Must(os.OpenFile("domain-not-cn.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644))
 	defer nf.Close()
 
+	nsIp := &sync.Map{}
+
 	bar := progressbar.Default(int64(donmainLen))
 	skip := last != ""
 	for _, txt := range sl {
@@ -72,7 +74,7 @@ func main() {
 				var addr string
 				var err error
 				for _, a := range addrs {
-					addr, err = dnsHttp(ctx, a)
+					addr, err = dnsHttp(ctx, a, "1")
 					if err != nil {
 						return err
 					}
@@ -81,7 +83,13 @@ func main() {
 					}
 				}
 				if addr == "" {
-					return nil
+					addr, err := getNsIp(ctx, txt, nsIp)
+					if err != nil {
+						return err
+					}
+					if addr == "" {
+						return nil
+					}
 				}
 				netip := net.ParseIP(addr)
 				if netip == nil {
