@@ -45,6 +45,6 @@ func getNsIp(ctx context.Context, domain string, nsIp *sync.Map) (string, error)
 	if err != nil {
 		return "", err
 	}
-	nsIp.CompareAndSwap(domain, v, ip)
+	nsIp.Store(domain, ip)
 	return ip, nil
 }

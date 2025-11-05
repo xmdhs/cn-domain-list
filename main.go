@@ -146,19 +146,21 @@ func main() {
 			},
 		}
 		filePath := "site/" + char + ".json"
-		nf, err := os.Create(filePath)
-		if err != nil {
-			log.Printf("Failed to create file %s: %v", filePath, err)
-			continue
-		}
-		defer nf.Close()
+		func() {
+			nf, err := os.Create(filePath)
+			if err != nil {
+				log.Printf("Failed to create file %s: %v", filePath, err)
+				return
+			}
+			defer nf.Close()
 
-		e := json.NewEncoder(nf)
-		e.SetIndent("", "    ")
-		e.SetEscapeHTML(false)
-		if err := e.Encode(geoData); err != nil {
-			log.Printf("Failed to write to file %s: %v", filePath, err)
-		}
+			e := json.NewEncoder(nf)
+			e.SetIndent("", "    ")
+			e.SetEscapeHTML(false)
+			if err := e.Encode(geoData); err != nil {
+				log.Printf("Failed to write to file %s: %v", filePath, err)
+			}
+		}()
 	}
 }
 
