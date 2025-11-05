@@ -83,7 +83,7 @@ func main() {
 					}
 				}
 				if addr == "" {
-					addr, err := getNsIp(ctx, txt, nsIp)
+					addr, err = getNsIp(ctx, txt, nsIp)
 					if err != nil {
 						return err
 					}

@@ -22,3 +22,9 @@ func Test_getNsIp(t *testing.T) {
 
 	getNsIp(context.Background(), "xmdhs.com", nsIp)
 }
+
+func Test_getDoH(t *testing.T) {
+	for range 10 {
+		fmt.Println(getDoH())
+	}
+}

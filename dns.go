@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"io"
+	"math/rand/v2"
 	"net/http"
 	"net/url"
 	"sync"
@@ -10,8 +11,17 @@ import (
 	"github.com/tidwall/gjson"
 )
 
+var doh = []string{
+	"https://dns.alidns.com/resolve",
+	"https://doh.pub/resolve",
+}
+
+func getDoH() string {
+	return doh[rand.IntN(len(doh))]
+}
+
 func dnsHttp(ctx context.Context, domain string, Type string) (string, error) {
-	u, err := url.Parse("https://dns.alidns.com/resolve?name=example.com&type=1")
+	u, err := url.Parse(getDoH())
 	if err != nil {
 		return "", err
 	}
