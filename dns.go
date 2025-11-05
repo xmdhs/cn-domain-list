@@ -14,6 +14,7 @@ import (
 var doh = []string{
 	"https://dns.alidns.com/resolve",
 	"https://doh.pub/resolve",
+	"https://doh.360.cn/resolve",
 }
 
 func getDoH() string {
