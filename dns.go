@@ -37,14 +37,18 @@ func dnsHttp(ctx context.Context, domain string, Type string) (string, error) {
 }
 
 func getNsIp(ctx context.Context, domain string, nsIp *sync.Map) (string, error) {
-	v, ok := nsIp.Load(domain)
-	if ok {
-		return v.(string), nil
-	}
-	ip, err := dnsHttp(ctx, domain, "2")
+	nsServer, err := dnsHttp(ctx, domain, "2")
 	if err != nil {
 		return "", err
 	}
-	nsIp.Store(domain, ip)
+	v, ok := nsIp.Load(nsServer)
+	if ok {
+		return v.(string), nil
+	}
+	ip, err := dnsHttp(ctx, nsServer, "1")
+	if err != nil {
+		return "", err
+	}
+	nsIp.Store(nsServer, ip)
 	return ip, nil
 }
