@@ -61,6 +61,10 @@ func main() {
 			bar.Add(1)
 			continue
 		}
+		if _, ok := set[txt]; ok {
+			bar.Add(1)
+			continue
+		}
 		g.Go(func() error {
 			defer bar.Add(1)
 			p, _ := publicsuffix.PublicSuffix(txt)
