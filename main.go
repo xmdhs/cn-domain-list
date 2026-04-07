@@ -31,13 +31,15 @@ func main() {
 
 	set := geosite()
 
+	cnSet := cnGeoSite()
+
 	ctx := context.Background()
 
 	g, gCtx := errgroup.WithContext(ctx)
 	g.SetLimit(64)
 
 	dl, last := readLog(set, "domain.log")
-	ndl, _ := readLog(set, "domain-not-cn.log")
+	ndl, _ := readLog(cnSet, "domain-not-cn.log")
 	dlLock := &sync.Mutex{}
 
 	sl := strings.Split(string(b), "\n")
@@ -58,10 +60,6 @@ func main() {
 			skip = false
 		}
 		if skip {
-			bar.Add(1)
-			continue
-		}
-		if _, ok := set[txt]; ok {
 			bar.Add(1)
 			continue
 		}
@@ -101,10 +99,11 @@ func main() {
 				}
 				c := lo.Must(db.Country(netip))
 				dlLock.Lock()
-				if c.Country.IsoCode == "CN" {
+				_, ok := set[txt]
+				if c.Country.IsoCode == "CN" && !ok {
 					dl = append(dl, txt)
 					lo.Must(f.WriteString(txt + "\n"))
-				} else {
+				} else if _, ok := cnSet[txt]; !ok {
 					ndl = append(ndl, txt)
 					lo.Must(nf.WriteString(txt + "\n"))
 				}
@@ -199,6 +198,12 @@ func writeRuleFile(dl []string, fileName string) {
 func geosite() map[string]struct{} {
 	m := map[string]struct{}{}
 	readGeoSite("geosite-geolocation-!cn.json", m)
+	return m
+}
+
+func cnGeoSite() map[string]struct{} {
+	m := map[string]struct{}{}
+	readGeoSite("geosite-geolocation-cn.json", m)
 	return m
 }
 
